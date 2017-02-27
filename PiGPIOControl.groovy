@@ -14,17 +14,17 @@
  *
  */
  
- preferences {
-	input("ip", "text", title: "IP", description: "The IP address of your Raspberry Pi i.e. 192.168.1.100")
-	input("port", "text", title: "Port", description: "The port your HTTP service is running on. The default is 80", default: "80")
-	input("gpio", "text", title: "GPIO#", description: "The GPIO pin your relay is connected to")
-  input("rev", "text", title: "Version", description: "What version pi are you using?")
+preferences {
+	 input("ip", "text", title: "IP", description: "The IP address of your Raspberry Pi i.e. 192.168.1.100")
+	 input("port", "text", title: "Port", description: "The port your HTTP service is running on. The default is 80", default: "80")
+	 input("gpio", "text", title: "GPIO#", description: "The GPIO pin your relay is connected to")
+	 input("rev", "text", title: "Version", description: "What version pi are you using?")
 } 
 
 metadata {
 	definition (name: "Pi Relay Control", namespace: "FireyProtons.garagePiST", author: "FireyProtons") {
 		capability "Switch"
-    capability "Refresh"
+		capability "Refresh"
 		capability "Polling"
 	}
 
@@ -34,11 +34,11 @@ metadata {
 
 	tiles {
 		standardTile("switch", "device.switch", width: 1, height: 1, canChangeIcon: true) {
-		  state "on", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", backgroundColor:"#79b821"
-		  state "off", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", backgroundColor:"#ffffff"
+			state "on", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", backgroundColor:"#79b821"
+			state "off", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", backgroundColor:"#ffffff"
 		}
                 
-    standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 1, height: 1) {
+                standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 1, height: 1) {
 			state("default", label:'refresh', action:"polling.poll", icon:"st.secondary.refresh-icon")
 		}
 
