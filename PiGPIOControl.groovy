@@ -52,25 +52,24 @@ def parse(String description) {
 	//log.debug "Parsing '${description}'"
 	def msg = parseLanMessage(description)
 	log.info "Return data: " + msg.header
+	
+	def response = msg.body;
     
-  def response = msg.body;
-    
-  // The GPIO direction was set
-  if(response == "IN" || response == "OUT"){
-    log.debug "GPIO position response";
-    data.pinDirection = response;
-    log.debug "GPIO $settings.gpio direction is " + data.pinDirection
+	// The GPIO direction was set
+	if(response == "IN" || response == "OUT"){
+		log.debug "GPIO position response";
+		data.pinDirection = response;
+		log.debug "GPIO $settings.gpio direction is " + data.pinDirection
         
-    // Now that we have ensured the GPIO direction is set correctly, update its state
-    data.pinDirectionSet = true;
-  }
+		// Now that we have ensured the GPIO direction is set correctly, update its state
+		data.pinDirectionSet = true;
+	}
     
-    // We need to update the UI with the state
-    if(response == "1" || response == "0"){
-    	log.debug "GPIO state response"
+	// We need to update the UI with the state
+	if(response == "1" || response == "0"){
+    		log.debug "GPIO state response"
 		setUI(response)
-    }
-    
+    	}
 }
 
 def poll() {
@@ -89,10 +88,10 @@ def refresh() {
 def setDeviceToggle(state) {
 	log.debug "Executing 'setDeviceState'"
     
-  def Path = "/toggle.php";
+  	def Path = "/toggle.php";
 	Path += (state == "on") ? "1" : "0";
     
-  executeRequest(Path, "POST", false);
+  	executeRequest(Path, "POST", false);
 }
 
 def setUI(response){
