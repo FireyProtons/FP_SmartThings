@@ -13,12 +13,11 @@
  *  for the specific language governing permissions and limitations under the License.
  *
  */
- 
+
 preferences {
-	 input("ip", "text", title: "IP", description: "The IP address of your Raspberry Pi i.e. 192.168.1.100")
-	 input("port", "text", title: "Port", description: "The port your HTTP service is running on. The default is 80", default: "80")
-	 input("gpio", "text", title: "GPIO#", description: "The GPIO pin your relay is connected to")
-	 input("rev", "text", title: "Version", description: "What version pi are you using?")
+	input("ip", "text", title: "IP", description: "The ip of your raspberry pi i.e. 192.168.1.110")
+	input("port", "text", title: "Port", description: "The port your Apache service is running on. The default is 80", default: "80")
+	input("gpio", "text", title: "GPIO#", description: "The GPIO pin your relay is connected to")
 } 
 
 metadata {
@@ -34,11 +33,11 @@ metadata {
 
 	tiles {
 		standardTile("switch", "device.switch", width: 1, height: 1, canChangeIcon: true) {
-			state "on", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", backgroundColor:"#79b821"
-			state "off", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", backgroundColor:"#ffffff"
+			state "on", label:'Closed', action:"switch.off", icon:"st.switches.switch.on", backgroundColor:"#79b821"
+			state "off", label:'Open', action:"switch.on", icon:"st.switches.switch.off", backgroundColor:"#ff0000"
 		}
                 
-                standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 1, height: 1) {
+        standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 1, height: 1) {
 			state("default", label:'refresh', action:"polling.poll", icon:"st.secondary.refresh-icon")
 		}
 
@@ -49,34 +48,27 @@ metadata {
 
 // parse events into attributes
 def parse(String description) {
-	//log.debug "Parsing '${description}'"
+	log.debug "Parsing '${description}'"
 	def msg = parseLanMessage(description)
 	log.info "Return data: " + msg.header
-	
-	def response = msg.body;
     
-	// The GPIO direction was set
-	if(response == "IN" || response == "OUT"){
-		log.debug "GPIO position response";
-		data.pinDirection = response;
-		log.debug "GPIO $settings.gpio direction is " + data.pinDirection
-        
-		// Now that we have ensured the GPIO direction is set correctly, update its state
-		data.pinDirectionSet = true;
-	}
+    def response = msg.body
+    def strResponse = response[0..response.length()-3]
+    log.debug strResponse + " is the only one for me."
     
 	// We need to update the UI with the state
-	if(response == "1" || response == "0"){
-    		log.debug "GPIO state response"
-		setUI(response)
-    	}
+    if(strResponse == 'closed' || strResponse == 'open'){
+    	log.debug "GPIO state response"
+		setUI(strResponse)
+    }
 }
 
 def poll() {
 	log.debug "Executing 'poll'"   
         
 	storeNetworkDeviceId()
-	updateGpioState()
+    updateGpioState()
+
 }
 
 def refresh() {
@@ -85,33 +77,46 @@ def refresh() {
 	poll();
 }
 
-def setDeviceToggle(state) {
-	log.debug "Executing 'setDeviceState'"
+def on() {
+	log.debug "Executing 'on'"
     
-  	def Path = "/toggle.php";
-	Path += (state == "on") ? "1" : "0";
-    
-  	executeRequest(Path, "POST", false);
+    setDeviceState('closed')
 }
 
-def setUI(response){
+def off() {
+	log.debug "Executing 'off'"
+    
+    setDeviceState('open')
+}
+
+def setDeviceState(state) {
+	log.debug "Executing 'setDeviceState'"
+    
+  	def Path = "/php/toggle.php"
+	//Path += (state == "on") ? "1" : "0";
+    
+  	executeRequest(Path, "POST", false)
+	//setUI(state)
+}
+
+def setUI(strResponse){
 	   
-    log.debug "Relay current state: " + response       
+    log.debug "Garage current state: " + strResponse   
     
-    def switchState = response == "1" ? "on" : "off";
-    log.debug "New state is: " + switchState;
+    def switchState = strResponse == "closed" ? "on" : "off";
+    log.debug "New state is: " + switchState
     
-    sendEvent(name: "switch", value: switchState);     
+    sendEvent(name: "switch", value: switchState)
 }
 
 def updateGpioState(){
 	
-    executeRequest("/status.php", "GET", false);   
+    executeRequest("/php/status.php", "GET", false);
 }
 
 def executeRequest(Path, method, overridePinDirectionCheck) {
 		
-	log.debug "The " + method + " path is: " + Path;
+	//log.debug "The " + method + " path is: " + Path;
 	
 	storeNetworkDeviceId()
     
@@ -123,8 +128,9 @@ def executeRequest(Path, method, overridePinDirectionCheck) {
         def actualAction = new physicalgraph.device.HubAction(
             method: method,
             path: Path,
-            headers: headers)
-        
+            headers: headers,
+            query: [data: "value1"])
+        	
         def hubAction = [delayAction(100), actualAction]
         
    		return hubAction
@@ -135,7 +141,7 @@ def executeRequest(Path, method, overridePinDirectionCheck) {
 }
 
 private delayAction(long time) {
-	log.debug "Delaying by: " + time
+	//log.debug "Delaying by: " + time
     
 	new physicalgraph.device.HubAction("delay $time")
 }
