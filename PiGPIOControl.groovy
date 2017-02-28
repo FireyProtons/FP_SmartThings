@@ -14,17 +14,17 @@
  *
  */
  
- preferences {
-	input("ip", "text", title: "IP", description: "The IP address of your Raspberry Pi i.e. 192.168.1.100")
-	input("port", "text", title: "Port", description: "The port your HTTP service is running on. The default is 80", default: "80")
-	input("gpio", "text", title: "GPIO#", description: "The GPIO pin your relay is connected to")
-  input("rev", "text", title: "Version", description: "What version pi are you using?")
+preferences {
+	 input("ip", "text", title: "IP", description: "The IP address of your Raspberry Pi i.e. 192.168.1.100")
+	 input("port", "text", title: "Port", description: "The port your HTTP service is running on. The default is 80", default: "80")
+	 input("gpio", "text", title: "GPIO#", description: "The GPIO pin your relay is connected to")
+	 input("rev", "text", title: "Version", description: "What version pi are you using?")
 } 
 
 metadata {
 	definition (name: "Pi Relay Control", namespace: "FireyProtons.garagePiST", author: "FireyProtons") {
 		capability "Switch"
-    capability "Refresh"
+		capability "Refresh"
 		capability "Polling"
 	}
 
@@ -34,11 +34,11 @@ metadata {
 
 	tiles {
 		standardTile("switch", "device.switch", width: 1, height: 1, canChangeIcon: true) {
-		  state "on", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", backgroundColor:"#79b821"
-		  state "off", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", backgroundColor:"#ffffff"
+			state "on", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", backgroundColor:"#79b821"
+			state "off", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", backgroundColor:"#ffffff"
 		}
                 
-    standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 1, height: 1) {
+                standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 1, height: 1) {
 			state("default", label:'refresh', action:"polling.poll", icon:"st.secondary.refresh-icon")
 		}
 
@@ -52,25 +52,24 @@ def parse(String description) {
 	//log.debug "Parsing '${description}'"
 	def msg = parseLanMessage(description)
 	log.info "Return data: " + msg.header
+	
+	def response = msg.body;
     
-  def response = msg.body;
-    
-  // The GPIO direction was set
-  if(response == "IN" || response == "OUT"){
-    log.debug "GPIO position response";
-    data.pinDirection = response;
-    log.debug "GPIO $settings.gpio direction is " + data.pinDirection
+	// The GPIO direction was set
+	if(response == "IN" || response == "OUT"){
+		log.debug "GPIO position response";
+		data.pinDirection = response;
+		log.debug "GPIO $settings.gpio direction is " + data.pinDirection
         
-    // Now that we have ensured the GPIO direction is set correctly, update its state
-    data.pinDirectionSet = true;
-  }
+		// Now that we have ensured the GPIO direction is set correctly, update its state
+		data.pinDirectionSet = true;
+	}
     
-    // We need to update the UI with the state
-    if(response == "1" || response == "0"){
-    	log.debug "GPIO state response"
+	// We need to update the UI with the state
+	if(response == "1" || response == "0"){
+    		log.debug "GPIO state response"
 		setUI(response)
-    }
-    
+    	}
 }
 
 def poll() {
@@ -89,10 +88,10 @@ def refresh() {
 def setDeviceToggle(state) {
 	log.debug "Executing 'setDeviceState'"
     
-  def Path = "/toggle.php";
+  	def Path = "/toggle.php";
 	Path += (state == "on") ? "1" : "0";
     
-  executeRequest(Path, "POST", false);
+  	executeRequest(Path, "POST", false);
 }
 
 def setUI(response){
