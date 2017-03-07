@@ -16,13 +16,13 @@
 
 preferences {
 	input("ip", "text", title: "IP", description: "The ip of your raspberry pi i.e. 192.168.1.110")
-	input("port", "text", title: "Port", description: "The port your Apache service is running on. The default is 80", default: "80")
+	input("port", "text", title: "Port", description: "The port your HTTP service is running on. The default is 80", default: "80")
 	input("gpio", "text", title: "GPIO#", description: "The GPIO pin your relay is connected to")
 } 
 
 metadata {
 	definition (name: "Pi Relay Control", namespace: "FireyProtons", author: "FireyProtons") {
-		capability "Switch"
+		capability "doorControl"
 		capability "Refresh"
 		capability "Polling"
 	}
@@ -30,93 +30,111 @@ metadata {
 	simulator {
 		// TODO: define status and reply messages here
 	}
-
 	tiles {
-		standardTile("switch", "device.switch", width: 1, height: 1, canChangeIcon: true) {
-			state "on", label:'Closed', action:"switch.off", icon:"st.switches.switch.on", backgroundColor:"#79b821"
-			state "off", label:'Open', action:"switch.on", icon:"st.switches.switch.off", backgroundColor:"#ff0000"
+		standardTile("toggle", "device.door", width: 2, height: 2, canChangeIcon: true) {
+			state("open", label:'${name}', action:"door control.close", icon:"st.doors.garage.garage-open", backgroundColor:"#ffa81e", nextState:"closing")
+			state("closed", label:'${name}', action:"door control.open", icon:"st.doors.garage.garage-closed", backgroundColor:"#79b821", nextState:"opening")
+            state("opening", label:'${name}', icon:"st.doors.garage.garage-opening", backgroundColor:"#ffe71e")
+			state("closing", label:'${name}', icon:"st.doors.garage.garage-closing", backgroundColor:"#ffe71e")
+			
 		}
-                
-        standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat", width: 1, height: 1) {
-			state("default", label:'refresh', action:"polling.poll", icon:"st.secondary.refresh-icon")
+		standardTile("open", "device.door", inactiveLabel: false, decoration: "flat") {
+			state "default", label:'open', action:"door control.open", icon:"st.doors.garage.garage-opening"
+		}
+		standardTile("close", "device.door", inactiveLabel: false, decoration: "flat") {
+			state "default", label:'close', action:"door control.close", icon:"st.doors.garage.garage-closing"
 		}
 
-		main "switch"
-		details (["switch", "refresh"])
+		main "toggle"
+		details(["toggle", "open", "close"])
 	}
 }
 
 // parse events into attributes
 def parse(String description) {
-	log.debug "Parsing '${description}'"
+	//log.debug "Parsing '${description}'"
 	def msg = parseLanMessage(description)
-	log.info "Return data: " + msg.header
-    
+	//log.info "Return data: " + msg.header
+    def result = []
     def response = msg.body
-    def strResponse = response[0..response.length()-3]
-    log.debug strResponse + " is the only one for me."
-    
-	// We need to update the UI with the state
-    if(strResponse == 'closed' || strResponse == 'open'){
-    	log.debug "GPIO state response"
-		setUI(strResponse)
+    log.debug response + "some text"
+    def strResponse = "nothing yet"
+    if (response) {
+    	strResponse = response[0..response.length()-3]
     }
+    log.debug strResponse + "mod some text"
+	// We need to update the UI with the state
+    if(strResponse == 'closed' || strResponse == 'open') {
+    	log.debug "GPIO state response"
+		result << createEvent(name: "door", value: strResponse)
+    } else if (strResponse == "already closed") {
+    	result << createEvent(name: "door", value: "closed")
+    } else if (strResponse == "already open") {
+    	result << createEvent(name: "door", value: "open")
+    } else if (strResponse == "nothing yet"){
+        log.debug "error in response"
+    }
+
+    result
 }
 
 def poll() {
 	log.debug "Executing 'poll'"   
         
-	storeNetworkDeviceId()
+	//storeNetworkDeviceId()
     updateGpioState()
 
 }
 
-def refresh() {
-	log.debug "Executing 'refresh'"
+def open() {
+	log.debug "Executing 'open'"
     
-	poll();
+    def state = "open"
+  	def Path = "/php/open-door.php"
+    
+  	executeRequest(Path, "POST", "1")
+    runIn(25, poll())
 }
 
-def on() {
-	log.debug "Executing 'on'"
+def close() {
+	log.debug "Executing 'close'"
     
-    setDeviceState('closed')
+    def state = "close"
+  	def Path = "/php/close-door.php"
+    
+  	executeRequest(Path, "POST", "0")
+    runIn(25, poll())
 }
 
-def off() {
-	log.debug "Executing 'off'"
-    
-    setDeviceState('open')
+def opening() {
+	log.debug "Executing 'opening'"
 }
 
-def setDeviceState(state) {
-	log.debug "Executing 'setDeviceState'"
-    
-  	def Path = "/php/toggle.php"
-	//Path += (state == "on") ? "1" : "0";
-    
-  	executeRequest(Path, "POST", false)
-	//setUI(state)
+
+def closing() {
+	log.debug "Executing 'closing'"
 }
 
 def setUI(strResponse){
 	   
     log.debug "Garage current state: " + strResponse   
     
-    def switchState = strResponse == "closed" ? "on" : "off";
+    def switchState = strResponse == "Open" ? "Closed" : "Open"
     log.debug "New state is: " + switchState
     
-    sendEvent(name: "switch", value: switchState)
+    
+    //sendEvent(name: "switch", value: switchState)
+	sendEvent(name: "switch", value: strResponse)
 }
 
 def updateGpioState(){
 	
-    executeRequest("/php/status.php", "GET", false);
+    executeRequest("/php/status.php", "GET", "value");
 }
 
-def executeRequest(Path, method, overridePinDirectionCheck) {
+def executeRequest(Path, method, dataVal) {
 		
-	//log.debug "The " + method + " path is: " + Path;
+	log.debug "The " + method + " path is: " + Path + " with data: " + dataVal;
 	
 	storeNetworkDeviceId()
     
@@ -129,8 +147,8 @@ def executeRequest(Path, method, overridePinDirectionCheck) {
             method: method,
             path: Path,
             headers: headers,
-            query: [data: "value1"])
-        	
+            query: [data : dataVal])
+        log.debug actualAction	
         def hubAction = [delayAction(100), actualAction]
         
    		return hubAction
