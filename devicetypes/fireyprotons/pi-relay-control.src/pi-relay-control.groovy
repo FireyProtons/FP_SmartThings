@@ -22,10 +22,14 @@ preferences {
 
 metadata {
 	definition (name: "Pi Relay Control", namespace: "FireyProtons", author: "FireyProtons") {
-		capability "doorControl"
+		capability "Actuator"
+        capability "Sensor"
+        capability "Garage Door Control"
+        capability "Door Control"
 		capability "Refresh"
 		capability "Polling"
-	}
+        
+    }
 
 	simulator {
 		// TODO: define status and reply messages here
@@ -36,6 +40,7 @@ metadata {
 			state("closed", label:'${name}', action:"door control.open", icon:"st.doors.garage.garage-closed", backgroundColor:"#79b821", nextState:"opening")
             state("opening", label:'${name}', icon:"st.doors.garage.garage-opening", backgroundColor:"#ffe71e")
 			state("closing", label:'${name}', icon:"st.doors.garage.garage-closing", backgroundColor:"#ffe71e")
+            state("unknown", label:'${name}', action:"door control.refresh", icon:"st.doors.garage.garage-unknown", backgroundColor:"$ffffff")
 			
 		}
 		standardTile("open", "device.door", inactiveLabel: false, decoration: "flat") {
@@ -44,9 +49,12 @@ metadata {
 		standardTile("close", "device.door", inactiveLabel: false, decoration: "flat") {
 			state "default", label:'close', action:"door control.close", icon:"st.doors.garage.garage-closing"
 		}
+        standardTile("refresh", "device.door", width: 3, height: 1, inactiveLabel: false, decoration: "flat"){
+        	state "default", label: 'refresh', action:"door control.refresh", icon: "st.secondary.refresh"
+        }
 
 		main "toggle"
-		details(["toggle", "open", "close"])
+		details(["toggle", "open", "close", "refresh"])
 	}
 }
 
@@ -57,25 +65,22 @@ def parse(String description) {
 	//log.info "Return data: " + msg.header
     def result = []
     def response = msg.body
+    
     log.debug response + "some text"
+    
     def strResponse = "nothing yet"
     if (response) {
     	strResponse = response[0..response.length()-3]
     }
-    log.debug strResponse + "mod some text"
+    log.debug strResponse + " mod some text"
 	// We need to update the UI with the state
-    if(strResponse == 'closed' || strResponse == 'open') {
-    	log.debug "GPIO state response"
-		result << createEvent(name: "door", value: strResponse)
-    } else if (strResponse == "already closed") {
-    	result << createEvent(name: "door", value: "closed")
-    } else if (strResponse == "already open") {
-    	result << createEvent(name: "door", value: "open")
-    } else if (strResponse == "nothing yet"){
+    if(strResponse == "nothing yet"){
         log.debug "error in response"
+    }else{
+    	result << createEvent(name: "door", value: strResponse)
     }
-
-    result
+    
+    return result
 }
 
 def poll() {
@@ -83,58 +88,46 @@ def poll() {
         
 	//storeNetworkDeviceId()
     updateGpioState()
-
 }
+
+def refresh() {
+	log.debug "Executing 'refresh'"   
+    poll()
+}
+
 
 def open() {
 	log.debug "Executing 'open'"
-    
-    def state = "open"
-  	def Path = "/php/open-door.php"
-    
-  	executeRequest(Path, "POST", "1")
-    runIn(25, poll())
+  	def Path = "/php/garage.php?open=1"
+//    log.debug = "executing " + Path
+  	executeRequest(Path, "GET")	
 }
 
 def close() {
 	log.debug "Executing 'close'"
-    
-    def state = "close"
-  	def Path = "/php/close-door.php"
-    
-  	executeRequest(Path, "POST", "0")
-    runIn(25, poll())
+  	def Path = "/php/garage.php?close=1"
+//	log.debug = "executing " + Path
+	executeRequest(Path, "GET")
 }
 
 def opening() {
 	log.debug "Executing 'opening'"
+
 }
 
 
 def closing() {
 	log.debug "Executing 'closing'"
-}
 
-def setUI(strResponse){
-	   
-    log.debug "Garage current state: " + strResponse   
-    
-    def switchState = strResponse == "Open" ? "Closed" : "Open"
-    log.debug "New state is: " + switchState
-    
-    
-    //sendEvent(name: "switch", value: switchState)
-	sendEvent(name: "switch", value: strResponse)
 }
 
 def updateGpioState(){
-	
-    executeRequest("/php/status.php", "GET", "value");
+    def Path = "/php/garage.php?status=1"
+    executeRequest(Path, "GET");
 }
 
-def executeRequest(Path, method, dataVal) {
-		
-	log.debug "The " + method + " path is: " + Path + " with data: " + dataVal;
+def executeRequest(Path, method) {
+	log.debug "The " + method + " path is: " + Path;
 	
 	storeNetworkDeviceId()
     
@@ -146,12 +139,12 @@ def executeRequest(Path, method, dataVal) {
         def actualAction = new physicalgraph.device.HubAction(
             method: method,
             path: Path,
-            headers: headers,
-            query: [data : dataVal])
-        log.debug actualAction	
-        def hubAction = [delayAction(100), actualAction]
+            headers: headers)
+
+            log.debug actualAction
+    	    def hubAction = [delayAction(1000), actualAction]
         
-   		return hubAction
+   			return hubAction
     }
     catch (Exception e) {
         log.debug "Hit Exception $e on $hubAction"
@@ -181,6 +174,6 @@ private String convertIPtoHex(ipAddress) {
 
 private String convertPortToHex(port) {
     String hexport = port.toString().format( '%04x', port.toInteger() )
-    //log.debug hexport
+    //log.debug "Hexport is " + hexport
     return hexport
 }
