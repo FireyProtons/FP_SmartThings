@@ -32,8 +32,9 @@ metadata {
     }
 
 	simulator {
-		// TODO: define status and reply messages here
+				
 	}
+    
 	tiles {
 		standardTile("toggle", "device.door", width: 2, height: 2, canChangeIcon: true) {
 			state("open", label:'${name}', action:"door control.close", icon:"st.doors.garage.garage-open", backgroundColor:"#ffa81e", nextState:"closing")
@@ -49,8 +50,8 @@ metadata {
 		standardTile("close", "device.door", inactiveLabel: false, decoration: "flat") {
 			state "default", label:'close', action:"door control.close", icon:"st.doors.garage.garage-closing"
 		}
-        standardTile("refresh", "device.door", width: 3, height: 1, inactiveLabel: false, decoration: "flat"){
-        	state "default", label: 'refresh', action:"door control.refresh", icon: "st.secondary.refresh"
+        standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat") {
+        	state "default", label: 'refresh', action:"refresh.refresh", icon: "st.secondary.refresh"
         }
 
 		main "toggle"
@@ -143,7 +144,7 @@ def executeRequest(Path, method) {
 
             log.debug actualAction
     	    def hubAction = [delayAction(1000), actualAction]
-        
+        	log.debug hubAction
    			return hubAction
     }
     catch (Exception e) {
@@ -162,7 +163,7 @@ private storeNetworkDeviceId(){
     def porthex = convertPortToHex(settings.port)
     device.deviceNetworkId = "$iphex:$porthex" 
     
-    //log.debug device.deviceNetworkId
+    log.debug device.deviceNetworkId
 }
 
 private String convertIPtoHex(ipAddress) { 
