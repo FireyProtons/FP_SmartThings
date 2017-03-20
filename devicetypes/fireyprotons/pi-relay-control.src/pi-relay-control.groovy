@@ -109,7 +109,7 @@ def close() {
   	def Path = "/php/garage.php?close=1"
 //	log.debug = "executing " + Path
 	executeRequest(Path, "GET")
-    runIn(15, executeRequest(Path, "GET")) 
+//    runIn(15, executeRequest(Path, "GET")) 
 }
 
 def opening() {
