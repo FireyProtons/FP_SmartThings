@@ -25,7 +25,6 @@ metadata {
 		capability "Actuator"
         capability "Sensor"
         capability "Garage Door Control"
-        capability "Door Control"
 		capability "Refresh"
 		capability "Polling"
         
@@ -36,22 +35,22 @@ metadata {
 	}
     
 	tiles {
-		standardTile("toggle", "device.door", width: 2, height: 2, canChangeIcon: true) {
-			state("open", label:'${name}', action:"door control.close", icon:"st.doors.garage.garage-open", backgroundColor:"#ffa81e", nextState:"closing")
-			state("closed", label:'${name}', action:"door control.open", icon:"st.doors.garage.garage-closed", backgroundColor:"#79b821", nextState:"opening")
+		standardTile("toggle", "device.door", width: 2, height: 2, canChangeIcon: false) {
+			state("open", label:'${name}', action:"close", icon:"st.doors.garage.garage-open", backgroundColor:"#ffa81e", nextState:"closing")
+			state("closed", label:'${name}', action:"open", icon:"st.doors.garage.garage-closed", backgroundColor:"#79b821", nextState:"opening")
             state("opening", label:'${name}', icon:"st.doors.garage.garage-opening", backgroundColor:"#ffe71e")
 			state("closing", label:'${name}', icon:"st.doors.garage.garage-closing", backgroundColor:"#ffe71e")
-            state("unknown", label:'${name}', action:"door control.refresh", icon:"st.doors.garage.garage-unknown", backgroundColor:"$ffffff")
+            state("unknown", label:'${name}', action:"refresh", icon:"st.doors.garage.garage-unknown", backgroundColor:"$ffffff")
 			
 		}
 		standardTile("open", "device.door", inactiveLabel: false, decoration: "flat") {
-			state "default", label:'open', action:"door control.open", icon:"st.doors.garage.garage-opening"
+			state "default", label:'open', action:"open", icon:"st.doors.garage.garage-opening"
 		}
 		standardTile("close", "device.door", inactiveLabel: false, decoration: "flat") {
-			state "default", label:'close', action:"door control.close", icon:"st.doors.garage.garage-closing"
+			state "default", label:'close', action:"close", icon:"st.doors.garage.garage-closing"
 		}
         standardTile("refresh", "device.refresh", inactiveLabel: false, decoration: "flat") {
-        	state "default", label: 'refresh', action:"refresh.refresh", icon: "st.secondary.refresh"
+        	state "default", label: 'refresh', action:"refresh", icon: "st.secondary.refresh"
         }
 
 		main "toggle"
@@ -78,14 +77,14 @@ def parse(String description) {
     if(strResponse == "nothing yet"){
         log.debug "error in response"
     }else{
-    	result << createEvent(name: "door", value: strResponse)
+        result << createEvent(name: "door", value: strResponse)
     }
     
     return result
 }
 
 def poll() {
-	log.debug "Executing 'poll'"   
+//	log.debug "Executing 'poll'"   
         
 	//storeNetworkDeviceId()
     updateGpioState()
@@ -101,7 +100,8 @@ def open() {
 	log.debug "Executing 'open'"
   	def Path = "/php/garage.php?open=1"
 //    log.debug = "executing " + Path
-  	executeRequest(Path, "GET")	
+  	executeRequest(Path, "GET")
+//    runIn(25, executeRequest(Path, "GET"))
 }
 
 def close() {
@@ -109,6 +109,7 @@ def close() {
   	def Path = "/php/garage.php?close=1"
 //	log.debug = "executing " + Path
 	executeRequest(Path, "GET")
+    runIn(15, executeRequest(Path, "GET")) 
 }
 
 def opening() {
@@ -128,7 +129,7 @@ def updateGpioState(){
 }
 
 def executeRequest(Path, method) {
-	log.debug "The " + method + " path is: " + Path;
+	//log.debug "The " + method + " path is: " + Path;
 	
 	storeNetworkDeviceId()
     
@@ -142,9 +143,9 @@ def executeRequest(Path, method) {
             path: Path,
             headers: headers)
 
-            log.debug actualAction
+ //           log.debug actualAction
     	    def hubAction = [delayAction(1000), actualAction]
-        	log.debug hubAction
+ 
    			return hubAction
     }
     catch (Exception e) {
@@ -163,7 +164,7 @@ private storeNetworkDeviceId(){
     def porthex = convertPortToHex(settings.port)
     device.deviceNetworkId = "$iphex:$porthex" 
     
-    log.debug device.deviceNetworkId
+//    log.debug device.deviceNetworkId
 }
 
 private String convertIPtoHex(ipAddress) { 
