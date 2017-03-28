@@ -66,13 +66,11 @@ def parse(String description) {
     def result = []
     def response = msg.body
     
-    log.debug response + "some text"
-    
     def strResponse = "nothing yet"
     if (response) {
     	strResponse = response[0..response.length()-3]
     }
-    log.debug strResponse + " mod some text"
+
 	// We need to update the UI with the state
     if(strResponse == "nothing yet"){
         log.debug "error in response"
@@ -144,7 +142,7 @@ def executeRequest(Path, method) {
             headers: headers)
 
  //           log.debug actualAction
-    	    def hubAction = [delayAction(1000), actualAction]
+    	    def hubAction = [delayAction(10), actualAction]
  
    			return hubAction
     }
