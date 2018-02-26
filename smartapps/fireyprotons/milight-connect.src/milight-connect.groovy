@@ -21,7 +21,10 @@ definition(
     namespace: "FireyProtons",
     author: "Erik von Asten (FireyProtons)",
     description: "Service Manager for Milight bulbs",
-    category: "Convenience"
+    category: "Convenience",
+    iconUrl: "https://raw.githubusercontent.com/FireyProtons/FP_SmartThings/master/smartapps/fireyprotons/milight-connect.src/icon48x48.png",
+    iconX2Url: "https://raw.githubusercontent.com/FireyProtons/FP_SmartThings/master/smartapps/fireyprotons/milight-connect.src/icon120x120.png",
+    iconX3Url: "https://raw.githubusercontent.com/FireyProtons/FP_SmartThings/master/smartapps/fireyprotons/milight-connect.src/icon256x256.png"
 )
 
 preferences {
