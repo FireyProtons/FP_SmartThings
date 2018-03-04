@@ -16,6 +16,14 @@
  *  Date: 2015-7-12
  */
 
+preferences {
+		input("ip", "text", title: "IP", description: "The ip of your milight-hub i.e. 192.168.1.110", default: "192.168.10.191")
+        input("port", "text", title: "Port", description: "The port your HTTP service is running on. The default is 80", default: "80")
+        input("deviceID", "text", title: "Device ID", description: "The device ID associated with the bulb i.e. 0xABCD")
+		input("group", "enum", title: "Group Number", description: "The group number associated with the bulb or group", options: ["1", "2", "3", "4", "All"])
+        input("deviceType", "enum", title: "Device Type", description: "The type of Bulb", options: ["RGBW", "CCT", "RGB+CCT", "RGB", "FUT089"])
+}
+
 metadata {
 	definition (name: "Milight RGBW", namespace: "FireyProtons", author: "Erik von Asten") {
 		capability "Switch Level"
@@ -34,10 +42,8 @@ metadata {
 	}
 
 	standardTile("switch", "device.switch", width: 1, height: 1, canChangeIcon: true) {
-		state "on", label:'${name}', action:"switch.off", icon:"st.lights.philips.hue-single", backgroundColor:"#00a0dc", nextState:"turningOff"
-		state "off", label:'${name}', action:"switch.on", icon:"st.lights.philips.hue-single", backgroundColor:"#ffffff", nextState:"turningOn"
-		state "turningOn", label:'${name}', action:"switch.off", icon:"st.lights.philips.hue-single", backgroundColor:"#00a0dc", nextState:"turningOff"
-		state "turningOff", label:'${name}', action:"switch.on", icon:"st.lights.philips.hue-single", backgroundColor:"#ffffff", nextState:"turningOn"
+		state "on", label:'${name}', action:"switch.off", icon:"st.lights.philips.hue-single", backgroundColor:"#00a0dc", nextState:"off"
+		state "off", label:'${name}', action:"switch.on", icon:"st.lights.philips.hue-single", backgroundColor:"#ffffff", nextState:"on"
 	}
 	standardTile("reset", "device.reset", inactiveLabel: false, decoration: "flat") {
 		state "default", label:"Reset Color", action:"reset", icon:"st.lights.philips.hue-single"
@@ -54,15 +60,9 @@ metadata {
 	valueTile("level", "device.level", inactiveLabel: false, decoration: "flat") {
 		state "level", label: 'Level ${currentValue}%'
 	}
-	controlTile("colorTempControl", "device.colorTemperature", "slider", height: 1, width: 2, inactiveLabel: false) {
-		state "colorTemperature", action:"setColorTemperature"
-	}
-	valueTile("hue", "device.hue", inactiveLabel: false, decoration: "flat") {
-		state "hue", label: 'Hue ${currentValue}   '
-	}
-
+    
 	main(["switch"])
-	details(["switch", "levelSliderControl", "rgbSelector", "reset", "colorTempControl", "refresh"])
+	details(["switch", "levelSliderControl", "rgbSelector", "reset", "refresh"])
 }
 
 def updated() {
@@ -70,96 +70,32 @@ def updated() {
 }
 
 def parse(description) {
-	def result = null
-	if (description != "updated") {
-		def cmd = zwave.parse(description, [0x20: 1, 0x26: 3, 0x70: 1, 0x33:3])
-		if (cmd) {
-			result = zwaveEvent(cmd)
-			log.debug("'$description' parsed to $result")
-		} else {
-			log.debug("Couldn't zwave.parse '$description'")
-		}
-	}
-	result
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicReport cmd) {
-	dimmerEvents(cmd)
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicSet cmd) {
-	dimmerEvents(cmd)
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.switchmultilevelv3.SwitchMultilevelReport cmd) {
-	dimmerEvents(cmd)
-}
-
-private dimmerEvents(physicalgraph.zwave.Command cmd) {
-	def value = (cmd.value ? "on" : "off")
-	def result = [createEvent(name: "switch", value: value, descriptionText: "$device.displayName was turned $value")]
-	if (cmd.value) {
-		result << createEvent(name: "level", value: cmd.value, unit: "%")
-	}
-	return result
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.hailv1.Hail cmd) {
-	response(command(zwave.switchMultilevelV1.switchMultilevelGet()))
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.securityv1.SecurityMessageEncapsulation cmd) {
-	def encapsulatedCommand = cmd.encapsulatedCommand([0x20: 1, 0x84: 1])
-	if (encapsulatedCommand) {
-		state.sec = 1
-		def result = zwaveEvent(encapsulatedCommand)
-		result = result.collect {
-			if (it instanceof physicalgraph.device.HubAction && !it.toString().startsWith("9881")) {
-				response(cmd.CMD + "00" + it.toString())
-			} else {
-				it
-			}
-		}
-		result
-	}
-}
-
-
-def zwaveEvent(physicalgraph.zwave.Command cmd) {
-	def linkText = device.label ?: device.name
-	[linkText: linkText, descriptionText: "$linkText: $cmd", displayed: false]
+	log.debug description
 }
 
 def on() {
-	commands([
-		zwave.basicV1.basicSet(value: 0xFF),
-		zwave.switchMultilevelV3.switchMultilevelGet(),
-	], 3500)
+	def cmds = []
+    cmds << putAction("/gateways/${deviceID}/${deviceType}/${group}", '{"status":"on"}')
+    return cmds
 }
 
 def off() {
-	commands([
-		zwave.basicV1.basicSet(value: 0x00),
-		zwave.switchMultilevelV3.switchMultilevelGet(),
-	], 3500)
+	def cmds = []
+    cmds << putAction("/gateways/${deviceID}/${deviceType}/${group}", '{"status":"off"}')
+    return cmds
 }
 
 def setLevel(level) {
-	setLevel(level, 1)
-}
-
-def setLevel(level, duration) {
-	if(level > 99) level = 99
-	commands([
-		zwave.switchMultilevelV3.switchMultilevelSet(value: level, dimmingDuration: duration),
-		zwave.switchMultilevelV3.switchMultilevelGet(),
-	], (duration && duration < 12) ? (duration * 1000) : 3500)
+    def info = '{"level"'+":${level}}"
+    def cmds = []
+    cmds << putAction("/gateways/${deviceID}/${deviceType}/${group}", info)
+    return cmds
 }
 
 def refresh() {
-	commands([
-		zwave.switchMultilevelV3.switchMultilevelGet(),
-	], 1000)
+	def cmds = []
+    cmds << getAction("/gateways/${deviceID}/${deviceType}/${group}")
+    return cmds
 }
 
 def setSaturation(percent) {
@@ -167,32 +103,12 @@ def setSaturation(percent) {
 	setColor(saturation: percent)
 }
 
-def setHue(value) {
-	log.debug "setHue($value)"
-	setColor(hue: value)
-}
-
 def setColor(value) {
-	def result = []
-	log.debug "setColor: ${value}"
-	if (value.hex) {
-		def c = value.hex.findAll(/[0-9a-fA-F]{2}/).collect { Integer.parseInt(it, 16) }
-		result << zwave.switchColorV3.switchColorSet(red:c[0], green:c[1], blue:c[2], warmWhite:0, coldWhite:0)
-	} else {
-		def hue = value.hue ?: device.currentValue("hue")
-		def saturation = value.saturation ?: device.currentValue("saturation")
-		if(hue == null) hue = 13
-		if(saturation == null) saturation = 13
-		def rgb = huesatToRGB(hue, saturation)
-		result << zwave.switchColorV3.switchColorSet(red: rgb[0], green: rgb[1], blue: rgb[2], warmWhite:0, coldWhite:0)
-	}
-
-	if(value.hue) sendEvent(name: "hue", value: value.hue)
-	if(value.hex) sendEvent(name: "color", value: value.hex)
-	if(value.switch) sendEvent(name: "switch", value: value.switch)
-	if(value.saturation) sendEvent(name: "saturation", value: value.saturation)
-
-	commands(result)
+	def result = '{"color":{"r"'+":${value.red},"+'"g"'+":${value.green},"+'"b"'+":${value.blue}}}"
+	log.debug "setColor: ${result}"
+    def cmds = []
+    cmds << putAction("/gateways/${deviceID}/${deviceType}/${group}", result)
+    return cmds
 }
 
 def setColorTemperature(percent) {
@@ -202,21 +118,9 @@ def setColorTemperature(percent) {
 }
 
 def reset() {
-	log.debug "reset()"
-	sendEvent(name: "color", value: "#ffffff")
-	setColorTemperature(99)
-}
-
-private command(physicalgraph.zwave.Command cmd) {
-	if (state.sec) {
-		zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
-	} else {
-		cmd.format()
-	}
-}
-
-private commands(commands, delay=200) {
-	delayBetween(commands.collect{ command(it) }, delay)
+	def cmds = []
+    cmds << putAction("/gateways/${deviceID}/${deviceType}/${group}", '{"command":"set_white"}')
+    return cmds
 }
 
 def rgbToHSV(red, green, blue) {
@@ -255,4 +159,63 @@ def huesatToRGB(float hue, float sat) {
 		case 4: return [t, p, 255]
 		case 5: return [255, p, q]
 	}
+}
+
+private storeNetworkDeviceId(){
+    def iphex = convertIPtoHex(settings.ip).toUpperCase()
+    def porthex = convertPortToHex(settings.port)
+    device.deviceNetworkId = "$iphex:$porthex" 
+    
+//    log.debug device.deviceNetworkId
+}
+
+private String convertIPtoHex(ipAddress) { 
+    String hex = ipAddress.tokenize( '.' ).collect {  String.format( '%02x', it.toInteger() ) }.join()
+    //log.debug "IP address entered is $ipAddress and the converted hex code is $hex"
+    return hex
+
+}
+
+private String convertPortToHex(port) {
+    String hexport = port.toString().format( '%04x', port.toInteger() )
+    //log.debug "Hexport is " + hexport
+    return hexport
+}
+
+private getHeader(){
+    def headers = [:]
+    headers.put("Host", getHostAddress())
+    headers.put("Content-Type", "application/json")
+    return headers
+}
+
+private putAction(uri, data){   
+  def headers = getHeader()
+//  log.debug "put data is: " + data
+  def hubAction = new physicalgraph.device.HubAction(
+    method: "PUT",
+    path: uri,
+    headers: headers,
+    body: data
+  )
+  return hubAction    
+}
+
+private getAction(uri){ 
+  //log.debug uri
+//  if(password != null && password != "") 
+//    userpass = encodeCredentials("admin", password)
+    
+  def headers = getHeader()
+
+  def hubAction = new physicalgraph.device.HubAction(
+    method: "GET",
+    path: uri,
+    headers: headers
+  )
+  return hubAction    
+}
+
+private getHostAddress() {
+	return "${ip}:${port}"
 }
