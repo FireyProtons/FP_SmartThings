@@ -28,7 +28,7 @@ definition(
 )
 
 preferences {
-	page(name: "mainPage")
+    page(name: "mainPage")
     page(name: "configurePDevice")
     page(name: "deletePDevice")
     page(name: "changeName")
@@ -52,6 +52,7 @@ def mainPage() {
 
 def configurePDevice(params){
    if (params?.did || params?.params?.did) {
+   log.debug "I made it to the params part of the program"
       if (params.did) {
          state.currentDeviceId = params.did
          state.currentDisplayName = getChildDevice(params.did)?.displayName
@@ -71,43 +72,6 @@ def configurePDevice(params){
               href "deletePDevice", title:"Delete $state.currentDisplayName", description: ""
         }
    }
-}
-
-def manuallyAdd(){
-   dynamicPage(name: "manuallyAdd", title: "Manually add a Milight bulb", nextPage: "manuallyAddConfirm") {
-		section {
-			paragraph "This process will manually create a Milight device based on the entered IP address. The SmartApp needs to then communicate with the device to obtain additional information from it."
-            input "deviceType", "enum", title:"Device Type", description: "", required: false, options: ["Milight RGBW","Milight CCT+W"]
-            input "ipAddress", "text", title:"IP Address", description: "", required: false 
-		}
-    }
-}
-
-def manuallyAddConfirm(){
-   if ( ipAddress =~ /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/) {
-       log.debug "Creating Milight bulb with dni: ${convertIPtoHex(ipAddress)}:${convertPortToHex("80")}"
-       addChildDevice("fireyprotons", deviceType ? deviceType : "Milight Bulb", "${convertIPtoHex(ipAddress)}:${convertPortToHex("80")}", location.hubs[0].id, [
-           "label": (deviceType ? deviceType : "Milight Bulb") + " (${ipAddress})",
-           "data": [
-           "ip": ipAddress,
-           "port": "80" 
-           ]
-       ])
-   
-       app.updateSetting("ipAddress", "")
-            
-       dynamicPage(name: "manuallyAddConfirm", title: "Manually add a Milight bulb", nextPage: "mainPage") {
-		   section {
-			   paragraph "The bulb has been added. Press next to return to the main page."
-	    	}
-       }
-    } else {
-        dynamicPage(name: "manuallyAddConfirm", title: "Manually add a Milight bulb", nextPage: "mainPage") {
-		    section {
-			    paragraph "The entered ip address is not valid. Please try again."
-		    }
-        }
-    }
 }
 
 def deletePDevice(){
@@ -141,6 +105,62 @@ def changeName(){
     }
 }
 
+def manuallyAdd(){
+   dynamicPage(name: "manuallyAdd", title: "Manually add a Milight bulb", nextPage: "manuallyAddConfirm") {
+		section {
+			paragraph "This process will manually create a Milight device based on the entered options. The SmartApp needs to then communicate with the device to obtain additional information from it."
+//            input "deviceType", "enum", title:"Device Type", description: "", required: true, options: ["RGBW","CCT","RGB+CCT","RGB","FUT089"], default: "RGBW"
+            input "deviceType", "enum", title:"Device Type", description: "", required: true, options: ["RGBW"], default: "RGBW"
+            input "deviceID", "text", title:"Device ID", description: "", required: true
+            input "groupID", "enum", title: "Group ID", description: "", required: false, options: ["1","2","3","4","All"]
+            input "ip", "text", title:"IP Address", description: "", required: true, default: "192.168.10.191"
+		}
+    }
+}
+
+def manuallyAddConfirm(){
+   if ( ip =~ /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/ ) {
+       log.debug "Creating Milight bulb with DNI: ${deviceID}:${group}"
+       def deviceHandlerName
+       if (deviceType == "RGBW")
+            deviceHandlerName = "Milight RGBW"
+//        else if (deviceType == "CC")
+//            deviceHandlerName = "Milight CCT"
+//		else if (deviceType == "RGB+CCT")
+//			deviceHandlerName = "Milight RGB+CCT"
+//		else if (deviceType == "FUT089")
+//			deviceHandlerName = "Milight FUT089"
+//		else
+//			deviceHandlerName = "Milight RGB"
+	   addChildDevice("fireyprotons", deviceHandlerName, "${deviceID}:${group}", location.hubs[0].id, [
+           "label": deviceType + " (${deviceID}:${group})",
+           "data": [
+           "deviceType": deviceType,
+		   "deviceID": deviceID,
+		   "group": groupID,
+		   "ip": ip,
+           "port": "80" 
+           ]
+       ])
+   
+       app.updateSetting("ip", "")
+            
+       dynamicPage(name: "manuallyAddConfirm", title: "Manually add a Milight bulb", nextPage: "mainPage") {
+		   section {
+			   paragraph "The bulb has been added. Press next to return to the main page."
+	    	}
+       }
+    } else {
+        dynamicPage(name: "manuallyAddConfirm", title: "Manually add a Milight bulb", nextPage: "mainPage") {
+		    section {
+			    paragraph "The entered ip address or URL is not valid. Please try again."
+		    }
+        }
+    }
+}
+
+/* FUNCTIONS */
+
 def getVerifiedDevices() {
 	getDevices().findAll{ it?.value?.verified == true }
 }
@@ -159,7 +179,7 @@ def isConfigured(){
 
 def isVirtualConfigured(did){ 
     def foundDevice = false
-    getChildDevices().each {
+   getChildDevices().each {
        if(it.deviceNetworkId != null){
        if(it.deviceNetworkId.startsWith("${did}/")) foundDevice = true
        }
@@ -180,15 +200,14 @@ private getDeviceID(number) {
 }
 
 def installed() {
-	initialize()
+//	initialize()
 }
 
 def updated() {
 	unsubscribe()
     unschedule()
-	initialize()
+//	initialize()
 }
-
 
 void verifyDevices() {
     def devices = getDevices().findAll { it?.value?.verified != true }
@@ -224,46 +243,52 @@ def addDevices() {
     def sectionText = ""
 
     selectedDevices.each { dni ->bridgeLinking
-        def selectedDevice = devices.find { it.value.mac == dni }
-        def d
-        if (selectedDevice) {
-            d = getChildDevices()?.find {
-                it.deviceNetworkId == selectedDevice.value.mac
-            }
+    def selectedDevice = devices.find { it.value.mac == dni }
+    def d
+    if (selectedDevice) {
+        d = getChildDevices()?.find {
+            it.deviceNetworkId == selectedDevice.value.mac
         }
+    }
 
-        if (!d) {
-            log.debug selectedDevice
-            log.debug "Creating Milight Bulb with dni: ${selectedDevice.value.mac}"
+    if (!d) {
+        log.debug selectedDevice
+        log.debug "Creating Milight Bulb with dni: ${selectedDevice.value.mac}"
 
-            def deviceHandlerName
-            if (selectedDevice?.value?.name?.startsWith("Milight RG"))
-                deviceHandlerName = "Milight RGBW"
-            else (selectedDevice?.value?.name?.startsWith("Milight CC"))
-                deviceHandlerName = "Milight CCT+W"
-            def newDevice = addChildDevice("fireyprotons", deviceHandlerName, selectedDevice.value.mac, selectedDevice?.value.hub, [
-                "label": selectedDevice?.value?.name ?: "Milight Bulb",
-                "data": [
-                    "mac": selectedDevice.value.mac,
-                    "ip": convertHexToIP(selectedDevice.value.networkAddress),
-                    "port": "" + Integer.parseInt(selectedDevice.value.deviceAddress,16)
-                ]
-            ])
-            sectionText = sectionText + "Succesfully added Milight bulb with ip address ${convertHexToIP(selectedDevice.value.networkAddress)} \r\n"
-        }
-        
-	} 
-    log.debug sectionText
-        return dynamicPage(name:"addDevices", title:"Devices Added", nextPage:"mainPage",  uninstall: true) {
-        if(sectionText != ""){
-		section("Add Milight Results:") {
-			paragraph sectionText
+        def deviceHandlerName
+        if (selectedDevice?.value?.name?.startsWith("RGBW"))
+            deviceHandlerName = "RGBW"
+        else if (selectedDevice?.value?.name?.startsWith("CC"))
+            deviceHandlerName = "CCT"
+		else if (selectedDevice?.value?.name?.startsWith("RGB+"))
+			deviceHandlerName = "RGB+CCT"
+		else if (selectedDevice?.value?.name?.startsWith("FUT"))
+			deviceHandlerName = "FUT089"
+		else
+			deviceHandlerName = "RGB"
+        def newDevice = addChildDevice("fireyprotons", deviceHandlerName, selectedDevice.value.mac, selectedDevice?.value.hub, [
+            "label": selectedDevice?.value?.name ?: "Milight Bulb",
+            "data": [
+                "mac": selectedDevice.value.mac,
+                "ip": convertHexToIP(selectedDevice.value.networkAddress),
+                "port": "" + Integer.parseInt(selectedDevice.value.deviceAddress,16)
+            ]
+        ])
+        sectionText = sectionText + "Succesfully added Milight bulb with ip address ${convertHexToIP(selectedDevice.value.networkAddress)} \r\n"
+    }        
+
+    } 
+log.debug sectionText
+    return dynamicPage(name:"addDevices", title:"Devices Added", nextPage:"mainPage",  uninstall: true) {
+    if(sectionText != ""){
+	    section("Add Milight Results:") {
+		    paragraph sectionText
 		}
-        }else{
+    }else{
         section("No devices added") {
 			paragraph "All selected devices have previously been added"
 		}
-        }
+    }
 }
     }
 
@@ -284,8 +309,8 @@ private Integer convertHexToInt(hex) {
 	Integer.parseInt(hex,16)
 }
 
-private String convertIPtoHex(ipAddress) { 
-    String hex = ipAddress.tokenize( '.' ).collect {  String.format( '%02x', it.toInteger() ) }.join()
+private String convertIPtoHex(ip) { 
+    String hex = ip.tokenize( '.' ).collect {  String.format( '%02x', it.toInteger() ) }.join()
     return hex
 }
 
